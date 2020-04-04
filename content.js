@@ -3,7 +3,6 @@ function start() {
         // This is not a jenkins server, nothing to do here
         return;
     }
-
     transformDateTimes()
 }
 
@@ -15,10 +14,12 @@ function transformDateTimes() {
 }
 
 function transformBuildTimes() {
+    removeEventListener() // Remove the listener to avoid recursion as we are about to modify the element
     for (let element of document.querySelectorAll('div[time]')) {
         const timestamp = parseInt(element.getAttribute('time'));
         element.firstChild.innerHTML =  moment(timestamp).format('DD-MMM-YYYY HH:mm');
     }
+    addEventListener() // Listen for changes to build times, as they are periodically refreshed
 }
 
 function transformConfigHistoryTimes() {
@@ -42,18 +43,22 @@ function transformChangesPageTimes() {
         const stringLength = element.innerHTML.length;
         const dateString = element.innerHTML.substring(stringLength - (DATE_LENGTH + 1), stringLength -1) // #381 \n  (13-Mar-2020 08:38:31)
         const dateWithTimeZone = `${dateString} ${getServerTimeZone()}`
-        const localDate = moment(dateWithTimeZone).format('DD-MMM-YYYY HH:mm:ss');
-        element.innerHTML = element.innerHTML.replace(dateString, localDate)
+        const localDate = moment(dateWithTimeZone);
+
+        if(!localDate.isValid()) {
+            continue
+        }
+
+        element.innerHTML = element.innerHTML.replace(dateString, localDate.format('DD-MMM-YYYY HH:mm:ss'))
     }
 }
 
-
 function transformBuildPageTime() {
     const title = document.querySelector("#main-panel h1");
-    const DATE_LENGTH = 20;
+    const DATE_LENGTH = 20; // Length of "13-Mar-2020 08:38:31"
     const trimmedTitle = title.innerHTML.trim();
     const stringLength = trimmedTitle.length;
-    const dateString = trimmedTitle.substring(stringLength - (DATE_LENGTH + 1), stringLength -1) // #381 \n  (13-Mar-2020 08:38:31)
+    const dateString = trimmedTitle.substring(stringLength - (DATE_LENGTH + 1), stringLength - 1) // #381 \n  (13-Mar-2020 08:38:31)
     const dateWithTimeZone = `${dateString} ${getServerTimeZone()}`
     const localDate = moment(dateWithTimeZone);
 
@@ -70,7 +75,26 @@ function getServerTimeZone() {  // Page generated: 14-Mar-2020 06:49:02 PDT -> P
     return serverTimeZone;
 }
 
+const DOMSubtreeModified = 'DOMSubtreeModified';
+
+function getBuildHistoryElement() {
+    return document.getElementById('buildHistory')
+}
+
+function addEventListener() {
+    const history = getBuildHistoryElement()
+    if (!history) {
+        return
+    }
+    history.addEventListener(DOMSubtreeModified,  transformBuildTimes)
+}
+
+function removeEventListener() {
+    const history = getBuildHistoryElement()
+    if (!history) {
+        return
+    }
+    history.removeEventListener(DOMSubtreeModified,  transformBuildTimes)
+}
+
 start();
-
-
-
